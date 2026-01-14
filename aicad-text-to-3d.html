@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AICAD Automation - Real AI CAD Generation</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/STLExporter.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Work+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0B0F19;
+            --bg-secondary: #141926;
+            --bg-tertiary: #1C2333;
+            --accent-cyan: #00F0FF;
+            --accent-blue: #0080FF;
+            --text-primary: #F0F2F5;
+            --text-secondary: #A0A8B8;
+            --text-dim: #6B7280;
+            --border: #2A3447;
+            --border-bright: #3A4557;
+            --success: #00FF88;
+            --warning: #FFB800;
+        }
+
+        body {
+            font-family: 'Work Sans', -apple-system, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        .bg-animated {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+            overflow: hidden;
+        }
+
+        .bg-animated::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background-image: 
+                linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: grid-drift 60s linear infinite;
+        }
+
+        @keyframes grid-drift {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+        }
+
+        header {
+            background: rgba(20, 25, 38, 0.9);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-text h1 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-text p {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--accent-cyan);
+        }
+
+        main {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 1200px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: rgba(20, 25, 38, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.5rem;
+        }
+
+        .input {
+            width: 100%;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 0.875rem 1rem;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
+        }
+
+        .input:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 0 3px rgba(0, 240, 255, 0.1);
+        }
+
+        textarea.input {
+            min-height: 120px;
+            resize: vertical;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 1rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 100%);
+            color: var(--bg-primary);
+            box-shadow: 0 4px 20px rgba(0, 240, 255, 0.3);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(0, 240, 255, 0.4);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-ready {
+            background: rgba(0, 255, 136, 0.1);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        #viewer-container {
+            width: 100%;
+            height: 500px;
+            background: linear-gradient(135deg, rgba(0, 128, 255, 0.05) 0%, rgba(0, 240, 255, 0.05) 100%);
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ai-status {
+            background: rgba(255, 184, 0, 0.1);
+            border: 1px solid var(--warning);
+            color: var(--warning);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .quick-examples {
+            display: grid;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .example-btn {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            padding: 0.75rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+            font-size: 0.85rem;
+        }
+
+        .example-btn:hover {
+            border-color: var(--accent-cyan);
+            color: var(--text-primary);
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .detail-card {
+            background: var(--bg-primary);
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .detail-label {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .detail-value {
+            font-size: 1.2rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .params-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 1rem;
+        }
+
+        .param-item label {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            text-transform: capitalize;
+        }
+
+        .param-item input {
+            width: 100%;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 0.625rem;
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .features-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        .feature-badge {
+            background: rgba(0, 240, 255, 0.1);
+            color: var(--accent-cyan);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            border: 1px solid rgba(0, 240, 255, 0.3);
+        }
+
+        .export-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 1rem;
+        }
+
+        .export-btn {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            padding: 1.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+
+        .export-btn:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--accent-cyan);
+            transform: translateY(-2px);
+        }
+
+        .export-format {
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1rem;
+            margin: 0.5rem 0 0.25rem;
+        }
+
+        .export-desc {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-dim);
+            font-size: 0.875rem;
+            border-top: 1px solid var(--border);
+            margin-top: 2rem;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-bright);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animated"></div>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Advanced Text Parser - Extracts real dimensions and features
+        class CADParser {
+            static parse(description) {
+                const text = description.toLowerCase();
+                
+                // Determine part type
+                let type = 'plate';
+                if (text.includes('bracket') || text.includes('l-bracket') || text.includes('l bracket')) {
+                    type = 'bracket';
+                } else if (text.includes('box') || text.includes('enclosure') || text.includes('case')) {
+                    type = 'box';
+                } else if (text.includes('cylinder') || text.includes('tube') || text.includes('spacer')) {
+                    type = 'cylinder';
+                }
+
+                // Extract dimensions with multiple patterns
+                const dimensions = {
+                    width: this.extractDimension(text, ['width', 'wide', 'w']),
+                    height: this.extractDimension(text, ['height', 'tall', 'high', 'h']),
+                    thickness: this.extractDimension(text, ['thick', 'thickness', 't']),
+                    depth: this.extractDimension(text, ['depth', 'deep', 'd']),
+                    diameter: this.extractDimension(text, ['diameter', 'dia', 'ø']),
+                    corner_radius: 2
+                };
+
+                // Parse hole specifications
+                const holes = this.extractHoles(text, dimensions);
+
+                return {
+                    type,
+                    dimensions,
+                    features: { holes },
+                    description
+                };
+            }
+
+            static extractDimension(text, keywords) {
+                // Pattern: "100mm", "100 mm", "100x80", etc.
+                for (const keyword of keywords) {
+                    // Try keyword-based extraction
+                    const pattern1 = new RegExp(`${keyword}[:\\s]*([0-9.]+)\\s*(?:mm|millimeter)?`, 'i');
+                    const match1 = text.match(pattern1);
+                    if (match1) return parseFloat(match1[1]);
+                }
+
+                // Try dimension extraction from "100x80x5" format
+                const dimMatch = text.match(/(\d+\.?\d*)\s*[xX×]\s*(\d+\.?\d*)(?:\s*[xX×]\s*(\d+\.?\d*))?/);
+                if (dimMatch) {
+                    if (keywords.includes('width')) return parseFloat(dimMatch[1]);
+                    if (keywords.includes('height')) return parseFloat(dimMatch[2]);
+                    if (keywords.includes('thickness') && dimMatch[3]) return parseFloat(dimMatch[3]);
+                }
+
+                // Try standalone numbers with context
+                const numbers = text.match(/\b(\d+\.?\d*)\s*(?:mm)?\b/g);
+                if (numbers && numbers.length > 0) {
+                    if (keywords.includes('width')) return parseFloat(numbers[0]);
+                    if (keywords.includes('height') && numbers.length > 1) return parseFloat(numbers[1]);
+                    if (keywords.includes('thickness') && numbers.length > 2) return parseFloat(numbers[2]);
+                }
+
+                // Defaults
+                if (keywords.includes('width')) return 100;
+                if (keywords.includes('height')) return 80;
+                if (keywords.includes('thickness')) return 5;
+                if (keywords.includes('depth')) return 60;
+                if (keywords.includes('diameter')) return 50;
+                
+                return null;
+            }
+
+            static extractHoles(text, dimensions) {
+                const holes = [];
+                
+                // Detect hole count
+                const countMatch = text.match(/(\d+)\s*(?:hole|mounting|corner)/i);
+                const holeCount = countMatch ? parseInt(countMatch[1]) : 4;
+
+                // Detect hole size (M5 = 5.5mm clearance)
+                let holeDiameter = 5.5;
+                const sizeMatch = text.match(/[mM](\d+)/);
+                if (sizeMatch) {
+                    holeDiameter = parseInt(sizeMatch[1]) + 0.5; // Add clearance
+                }
+
+                // Generate hole positions based on count
+                const w = dimensions.width || 100;
+                const h = dimensions.height || 80;
+                const margin = 10;
+
+                if (holeCount === 4) {
+                    // Corner holes
+                    holes.push(
+                        {x: -w/2 + margin, y: -h/2 + margin, diameter: holeDiameter},
+                        {x: w/2 - margin, y: -h/2 + margin, diameter: holeDiameter},
+                        {x: w/2 - margin, y: h/2 - margin, diameter: holeDiameter},
+                        {x: -w/2 + margin, y: h/2 - margin, diameter: holeDiameter}
+                    );
+                } else if (holeCount === 6) {
+                    // 6 holes (corners + midpoints)
+                    holes.push(
+                        {x: -w/2 + margin, y: -h/2 + margin, diameter: holeDiameter},
+                        {x: 0, y: -h/2 + margin, diameter: holeDiameter},
+                        {x: w/2 - margin, y: -h/2 + margin, diameter: holeDiameter},
+                        {x: w/2 - margin, y: h/2 - margin, diameter: holeDiameter},
+                        {x: 0, y: h/2 - margin, diameter: holeDiameter},
+                        {x: -w/2 + margin, y: h/2 - margin, diameter: holeDiameter}
+                    );
+                } else if (holeCount === 1) {
+                    // Center hole
+                    holes.push({x: 0, y: 0, diameter: holeDiameter});
+                }
+
+                return holes;
+            }
+        }
+
+        // Three.js CAD Generator
+        class CADGenerator {
+            constructor(container) {
+                this.container = container;
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+                this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                this.controls = null;
+                this.mesh = null;
+                
+                this.init();
+            }
+
+            init() {
+                this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+                this.renderer.setClearColor(0x0B0F19, 1);
+                this.container.appendChild(this.renderer.domElement);
+
+                this.camera.position.set(150, 100, 150);
+                this.camera.lookAt(0, 0, 0);
+
+                this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableDamping = true;
+                this.controls.dampingFactor = 0.05;
+
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                this.scene.add(ambientLight);
+
+                const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight1.position.set(100, 100, 50);
+                this.scene.add(directionalLight1);
+
+                const directionalLight2 = new THREE.DirectionalLight(0x00F0FF, 0.4);
+                directionalLight2.position.set(-50, 50, -50);
+                this.scene.add(directionalLight2);
+
+                const gridHelper = new THREE.GridHelper(200, 20, 0x00F0FF, 0x2A3447);
+                this.scene.add(gridHelper);
+
+                const axesHelper = new THREE.AxesHelper(50);
+                this.scene.add(axesHelper);
+
+                this.animate();
+            }
+
+            generateFromSpec(spec) {
+                if (this.mesh) {
+                    this.scene.remove(this.mesh);
+                }
+
+                const { type, dimensions, features } = spec;
+
+                if (type === 'plate' || type === 'mounting_plate') {
+                    this.generatePlate(dimensions, features);
+                } else if (type === 'bracket' || type === 'l_bracket') {
+                    this.generateBracket(dimensions, features);
+                } else if (type === 'box' || type === 'enclosure') {
+                    this.generateBox(dimensions, features);
+                } else if (type === 'cylinder') {
+                    this.generateCylinder(dimensions, features);
+                } else {
+                    this.generatePlate(dimensions, features);
+                }
+            }
+
+            generatePlate(dim, features) {
+                const { width, height, thickness, corner_radius } = dim;
+                const holes = features.holes || [];
+
+                const shape = new THREE.Shape();
+                const r = corner_radius || 2;
+                
+                shape.moveTo(-width/2 + r, -height/2);
+                shape.lineTo(width/2 - r, -height/2);
+                shape.quadraticCurveTo(width/2, -height/2, width/2, -height/2 + r);
+                shape.lineTo(width/2, height/2 - r);
+                shape.quadraticCurveTo(width/2, height/2, width/2 - r, height/2);
+                shape.lineTo(-width/2 + r, height/2);
+                shape.quadraticCurveTo(-width/2, height/2, -width/2, height/2 - r);
+                shape.lineTo(-width/2, -height/2 + r);
+                shape.quadraticCurveTo(-width/2, -height/2, -width/2 + r, -height/2);
+
+                holes.forEach(hole => {
+                    const holePath = new THREE.Path();
+                    holePath.absarc(hole.x, hole.y, hole.diameter / 2, 0, Math.PI * 2, false);
+                    shape.holes.push(holePath);
+                });
+
+                const extrudeSettings = {
+                    depth: thickness,
+                    bevelEnabled: true,
+                    bevelThickness: 0.5,
+                    bevelSize: 0.5,
+                    bevelSegments: 3
+                };
+
+                const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+                geometry.center();
+
+                const material = new THREE.MeshPhongMaterial({
+                    color: 0x00A8CC,
+                    specular: 0x00F0FF,
+                    shininess: 30
+                });
+
+                this.mesh = new THREE.Mesh(geometry, material);
+                this.mesh.rotation.x = -Math.PI / 2;
+                
+                const edges = new THREE.EdgesGeometry(geometry);
+                const lineMaterial = new THREE.LineBasicMaterial({ color: 0x00F0FF });
+                const wireframe = new THREE.LineSegments(edges, lineMaterial);
+                wireframe.rotation.x = -Math.PI / 2;
+                this.mesh.add(wireframe);
+
+                this.scene.add(this.mesh);
+                this.currentGeometry = geometry;
+            }
+
+            generateBracket(dim, features) {
+                const { width, height, thickness } = dim;
+                const group = new THREE.Group();
+
+                const material = new THREE.MeshPhongMaterial({
+                    color: 0x00A8CC,
+                    specular: 0x00F0FF,
+                    shininess: 30
+                });
+
+                // Vertical arm
+                const vGeometry = new THREE.BoxGeometry(thickness, height, width);
+                const vMesh = new THREE.Mesh(vGeometry, material);
+                vMesh.position.set(0, height/2, 0);
+
+                // Horizontal arm
+                const hGeometry = new THREE.BoxGeometry(width, thickness, width);
+                const hMesh = new THREE.Mesh(hGeometry, material);
+                hMesh.position.set(width/2 - thickness/2, thickness/2, 0);
+
+                group.add(vMesh);
+                group.add(hMesh);
+
+                this.mesh = group;
+                this.scene.add(this.mesh);
+                this.currentGeometry = vGeometry;
+            }
+
+            generateBox(dim, features) {
+                const { width, height, depth, thickness } = dim;
+                
+                const geometry = new THREE.BoxGeometry(width, height, depth);
+                const material = new THREE.MeshPhongMaterial({
+                    color: 0x00A8CC,
+                    specular: 0x00F0FF,
+                    shininess: 30
+                });
+
+                this.mesh = new THREE.Mesh(geometry, material);
+                
+                const edges = new THREE.EdgesGeometry(geometry);
+                const lineMaterial = new THREE.LineBasicMaterial({ color: 0x00F0FF });
+                const wireframe = new THREE.LineSegments(edges, lineMaterial);
+                this.mesh.add(wireframe);
+
+                this.scene.add(this.mesh);
+                this.currentGeometry = geometry;
+            }
+
+            generateCylinder(dim, features) {
+                const { diameter, height, thickness } = dim;
+                const holes = features.holes || [];
+                
+                const geometry = new THREE.CylinderGeometry(diameter/2, diameter/2, thickness, 32);
+                const material = new THREE.MeshPhongMaterial({
+                    color: 0x00A8CC,
+                    specular: 0x00F0FF,
+                    shininess: 30
+                });
+
+                this.mesh = new THREE.Mesh(geometry, material);
+                this.mesh.rotation.x = Math.PI / 2;
+                
+                const edges = new THREE.EdgesGeometry(geometry);
+                const lineMaterial = new THREE.LineBasicMaterial({ color: 0x00F0FF });
+                const wireframe = new THREE.LineSegments(edges, lineMaterial);
+                wireframe.rotation.x = Math.PI / 2;
+                this.mesh.add(wireframe);
+
+                this.scene.add(this.mesh);
+                this.currentGeometry = geometry;
+            }
+
+            exportSTL() {
+                if (!this.mesh) return null;
+                const exporter = new THREE.STLExporter();
+                return exporter.parse(this.mesh);
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                if (this.controls) this.controls.update();
+                this.renderer.render(this.scene, this.camera);
+            }
+
+            dispose() {
+                if (this.renderer) this.renderer.dispose();
+            }
+        }
+
+        function App() {
+            const [description, setDescription] = useState('');
+            const [project, setProject] = useState(null);
+            const [generating, setGenerating] = useState(false);
+            const [parseStatus, setParseStatus] = useState('');
+            
+            const viewerRef = useRef(null);
+            const cadGeneratorRef = useRef(null);
+
+            useEffect(() => {
+                if (viewerRef.current && !cadGeneratorRef.current) {
+                    cadGeneratorRef.current = new CADGenerator(viewerRef.current);
+                }
+                return () => {
+                    if (cadGeneratorRef.current) {
+                        cadGeneratorRef.current.dispose();
+                    }
+                };
+            }, []);
+
+            useEffect(() => {
+                if (project && cadGeneratorRef.current && project.cadSpec) {
+                    cadGeneratorRef.current.generateFromSpec(project.cadSpec);
+                }
+            }, [project]);
+
+            const generateCAD = async () => {
+                if (!description.trim()) return;
+                
+                setGenerating(true);
+                setParseStatus('🔍 Parsing your description...');
+                
+                await new Promise(r => setTimeout(r, 500));
+
+                // Parse the description
+                const cadSpec = CADParser.parse(description);
+                
+                setParseStatus('✨ Generating 3D geometry...');
+                await new Promise(r => setTimeout(r, 500));
+
+                const mockProject = {
+                    id: 'PROJ-' + Math.random().toString(36).substr(2, 8).toUpperCase(),
+                    description: description,
+                    cadSpec: cadSpec,
+                    status: 'ready',
+                    parameters: cadSpec.dimensions,
+                    features: [
+                        `Type: ${cadSpec.type.toUpperCase()}`,
+                        `Dimensions: ${cadSpec.dimensions.width}×${cadSpec.dimensions.height}×${cadSpec.dimensions.thickness}mm`,
+                        `Holes: ${cadSpec.features.holes?.length || 0}`,
+                        'Text-Parsed Geometry',
+                        'Parametric & Editable'
+                    ],
+                    constraints: 15,
+                    isValid: true,
+                    createdAt: new Date().toISOString()
+                };
+                
+                setProject(mockProject);
+                setParseStatus('');
+                setGenerating(false);
+            };
+
+            const loadExample = (example) => {
+                setDescription(example);
+            };
+
+            const updateParameter = (key, value) => {
+                if (!project) return;
+                const newParams = {
+                    ...project.parameters,
+                    [key]: parseFloat(value) || 0
+                };
+                const newSpec = {
+                    ...project.cadSpec,
+                    dimensions: newParams
+                };
+                setProject({
+                    ...project,
+                    parameters: newParams,
+                    cadSpec: newSpec
+                });
+            };
+
+            const exportFile = (format) => {
+                if (!project || !cadGeneratorRef.current) return;
+                
+                if (format === 'STL') {
+                    const stlString = cadGeneratorRef.current.exportSTL();
+                    if (stlString) {
+                        const blob = new Blob([stlString], { type: 'text/plain' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${project.id}.stl`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                    }
+                } else {
+                    alert(`${format} export coming soon! STL works now.`);
+                }
+            };
+
+            const examples = [
+                "Rectangular plate 120mm x 90mm x 6mm with 6 M6 holes",
+                "L-bracket 60mm x 40mm x 4mm thick",
+                "Square mounting plate 100 x 100 with 4 corner M5 holes",
+                "Box enclosure 80 x 60 x 40mm",
+                "Spacer cylinder 50mm diameter 10mm thick with M8 center hole"
+            ];
+
+            return (
+                <div className="container">
+                    <header>
+                        <div className="header-content">
+                            <div className="logo">
+                                <div className="logo-icon">
+                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+                                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                                    </svg>
+                                </div>
+                                <div className="logo-text">
+                                    <h1>AICAD Automation</h1>
+                                    <p>TEXT TO 3D CAD</p>
+                                </div>
+                            </div>
+                            <nav className="nav-links">
+                                <a href="#">Dashboard</a>
+                                <a href="#">Projects</a>
+                            </nav>
+                        </div>
+                    </header>
+
+                    <main>
+                        <div className="dashboard">
+                            <div>
+                                <div className="card">
+                                    <div className="card-header">
+                                        ✨ Describe Your Part
+                                    </div>
+                                    <div className="card-body">
+                                        <div className="form-group">
+                                            <label className="form-label">Natural Language</label>
+                                            <textarea
+                                                className="input"
+                                                placeholder="Type here... e.g., 'Rectangular plate 100mm x 80mm with 4 M5 corner holes'"
+                                                value={description}
+                                                onChange={(e) => setDescription(e.target.value)}
+                                            />
+                                        </div>
+
+                                        <button
+                                            className="btn btn-primary"
+                                            onClick={generateCAD}
+                                            disabled={!description.trim() || generating}
+                                        >
+                                            {generating ? '⚡ Generating...' : '🚀 Generate 3D CAD'}
+                                        </button>
+
+                                        {parseStatus && (
+                                            <div className="ai-status">
+                                                {parseStatus}
+                                            </div>
+                                        )}
+
+                                        <div className="form-group" style={{marginTop: '1.5rem'}}>
+                                            <label className="form-label">Quick Examples</label>
+                                            <div className="quick-examples">
+                                                {examples.map((ex, i) => (
+                                                    <button key={i} className="example-btn" onClick={() => loadExample(ex)}>
+                                                        {ex}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div className="card">
+                                    <div className="card-header">
+                                        <span>🎨 Real-Time 3D</span>
+                                        {project && (
+                                            <div className="status status-ready">
+                                                <div className="status-dot" />
+                                                LIVE
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="card-body" style={{padding: 0}}>
+                                        <div id="viewer-container" ref={viewerRef}></div>
+                                    </div>
+                                </div>
+
+                                {project && (
+                                    <>
+                                        <div className="card">
+                                            <div className="card-header">
+                                                📊 Parsed Data
+                                            </div>
+                                            <div className="card-body">
+                                                <div className="detail-card" style={{marginBottom: '1rem'}}>
+                                                    <div className="detail-label">Project ID</div>
+                                                    <div className="detail-value" style={{color: 'var(--accent-cyan)'}}>
+                                                        {project.id}
+                                                    </div>
+                                                </div>
+                                                <div className="details-grid">
+                                                    <div className="detail-card">
+                                                        <div className="detail-label">Type</div>
+                                                        <div className="detail-value">{project.cadSpec?.type?.toUpperCase()}</div>
+                                                    </div>
+                                                    <div className="detail-card">
+                                                        <div className="detail-label">Holes</div>
+                                                        <div className="detail-value">{project.cadSpec?.features?.holes?.length || 0}</div>
+                                                    </div>
+                                                    <div className="detail-card">
+                                                        <div className="detail-label">Status</div>
+                                                        <div className="detail-value" style={{color: 'var(--success)'}}>READY</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="card">
+                                            <div className="card-header">
+                                                🔧 Edit Dimensions
+                                            </div>
+                                            <div className="card-body">
+                                                <div className="params-grid">
+                                                    {Object.entries(project.parameters).filter(([k,v]) => v !== null).map(([key, value]) => (
+                                                        <div key={key} className="param-item">
+                                                            <label>{key.replace(/_/g, ' ')}</label>
+                                                            <input
+                                                                type="number"
+                                                                value={value}
+                                                                onChange={(e) => updateParameter(key, e.target.value)}
+                                                                step="0.5"
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <p style={{marginTop: '1rem', fontSize: '0.85rem', color: 'var(--text-dim)'}}>
+                                                    💡 Change any value - model updates instantly!
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="card">
+                                            <div className="card-header">
+                                                ✓ Features
+                                            </div>
+                                            <div className="card-body">
+                                                <div className="features-list">
+                                                    {project.features.map((feature, idx) => (
+                                                        <div key={idx} className="feature-badge">
+                                                            ✓ {feature}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="card">
+                                            <div className="card-header">
+                                                📥 Export
+                                            </div>
+                                            <div className="card-body">
+                                                <div className="export-grid">
+                                                    {[
+                                                        {format: 'STL', desc: '✅ Download'},
+                                                        {format: 'STEP', desc: 'CAD Format'},
+                                                        {format: 'DXF', desc: '2D Drawing'},
+                                                        {format: 'PDF', desc: 'Document'}
+                                                    ].map(({format, desc}) => (
+                                                        <div key={format} className="export-btn" onClick={() => exportFile(format)}>
+                                                            <div style={{fontSize: '2rem'}}>📦</div>
+                                                            <div className="export-format">{format}</div>
+                                                            <div className="export-desc">{desc}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </main>
+
+                    <footer>
+                        <p><strong>REAL TEXT-TO-3D CAD GENERATION</strong></p>
+                        <p className="mono" style={{marginTop: '0.5rem', fontSize: '0.75rem'}}>
+                            Advanced Parser • Three.js • Live Updates • STL Export
+                        </p>
+                    </footer>
+                </div>
+            );
+        }
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
